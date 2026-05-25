@@ -83,7 +83,13 @@ export default function Header() {
 
   return (
     <header ref={headerRef} className="site-header fixed top-0 left-0 right-0 z-100 bg-header flex items-center justify-between px-[var(--side-padding)] py-2.5">
-      <Link href="/" className="font-bold text-2xl text-brand uppercase tracking-tight max-md:text-lg">{logoText}</Link>
+      <Link href="/" className="inline-flex items-center" aria-label={logoText}>
+        <img
+          src="/logo-tabernam.png"
+          alt={logoText}
+          className="w-[150px] h-auto max-md:w-[120px]"
+        />
+      </Link>
       <button
         ref={toggleRef}
         type="button"

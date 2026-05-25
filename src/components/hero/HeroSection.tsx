@@ -40,20 +40,26 @@ export default function HeroSection(_props: Props) {
         paddingBottom: blockPadding,
       }}
     >
-      <div className="hero-inner bg-gray-70 w-full h-full flex flex-col items-center justify-center text-center gap-10 px-10 max-sm:gap-8 max-sm:py-16">
-        <div className="hero-headline flex flex-col gap-[30px] max-w-[65vw] w-full mx-auto max-[1100px]:max-w-[80vw] max-[1100px]:gap-5 max-sm:max-w-none max-sm:gap-4">
+      <div
+        className="hero-inner relative w-full h-full flex flex-col items-center justify-center text-center gap-10 px-10 max-sm:gap-8 max-sm:py-16 overflow-hidden bg-cover bg-center"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(10,15,25,0.4), rgba(10,15,25,0.4)), url('/world-map-with-texture-global-satellite-photo-earth-view-from-space.jpg')",
+        }}
+      >
+        <div className="hero-headline relative z-10 flex flex-col gap-[30px] max-w-[65vw] w-full mx-auto max-[1100px]:max-w-[80vw] max-[1100px]:gap-5 max-sm:max-w-none max-sm:gap-4">
           <motion.h1
-            className="text-[48px] font-extrabold tracking-[-0.04em] leading-tight text-text max-[1100px]:text-[40px] max-md:text-[32px] max-sm:text-[30px]"
+            className="text-[48px] font-extrabold tracking-[-0.04em] leading-tight text-white max-[1100px]:text-[40px] max-md:text-[32px] max-sm:text-[30px]"
             custom={0.1}
             initial="hidden"
             animate="visible"
             variants={fadeUp}
           >
             Four decades of foreign trade. A trusted bridge between{' '}
-            <span className="text-accent">Slovakia and China.</span>
+            <span className="text-white">Slovakia and China.</span>
           </motion.h1>
           <motion.p
-            className="text-xl font-medium leading-snug text-text max-w-[50vw] w-full mx-auto max-[1100px]:text-lg max-[1100px]:max-w-[70vw] max-md:text-base max-sm:text-base max-sm:max-w-none"
+            className="text-xl font-medium leading-snug text-white max-w-[50vw] w-full mx-auto max-[1100px]:text-lg max-[1100px]:max-w-[70vw] max-md:text-base max-sm:text-base max-sm:max-w-none"
             custom={0.2}
             initial="hidden"
             animate="visible"
