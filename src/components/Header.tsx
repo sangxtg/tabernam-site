@@ -84,11 +84,12 @@ export default function Header() {
   return (
     <header ref={headerRef} className="site-header fixed top-0 left-0 right-0 z-100 bg-header flex items-center justify-between px-[var(--side-padding)] py-2.5">
       <Link href="/" className="inline-flex items-center" aria-label={logoText}>
-        <img
-          src="/logo-tabernam.png"
-          alt={logoText}
-          className="w-[150px] h-auto max-md:w-[120px]"
-        />
+        <span
+          className="text-brand leading-none select-none text-[36px] max-md:text-[30px]"
+          style={{ fontFamily: 'var(--font-italianno), cursive' }}
+        >
+          {logoText}
+        </span>
       </Link>
       <button
         ref={toggleRef}
@@ -104,9 +105,11 @@ export default function Header() {
         <span className="nav-toggle-bar"></span>
       </button>
       <nav ref={navRef} className="nav flex items-center gap-4.5" id="primary-nav">
-        <Link href="/contact" className="text-base font-semibold px-2.5 py-2.5 text-text transition-opacity duration-200 hover:opacity-65" onClick={closeNav}>{t('nav.contact')}</Link>
-        <Link href="/about" className="text-base font-semibold px-2.5 py-2.5 text-text transition-opacity duration-200 hover:opacity-65" onClick={closeNav}>{t('nav.about')}</Link>
-        <ActivityLink className="text-base font-semibold px-2.5 py-2.5 text-text transition-opacity duration-200 hover:opacity-65" onClick={closeNav}>{t('nav.activity')}</ActivityLink>
+        <div className="nav-links flex items-center gap-4.5 md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 max-md:flex-col max-md:w-full max-md:items-stretch">
+          <Link href="/contact" className="text-base font-medium px-2.5 py-2.5 text-text transition-opacity duration-200 hover:opacity-65" onClick={closeNav}>{t('nav.contact')}</Link>
+          <Link href="/about" className="text-base font-medium px-2.5 py-2.5 text-text transition-opacity duration-200 hover:opacity-65" onClick={closeNav}>{t('nav.about')}</Link>
+          <ActivityLink className="text-base font-medium px-2.5 py-2.5 text-text transition-opacity duration-200 hover:opacity-65" onClick={closeNav}>{t('nav.activity')}</ActivityLink>
+        </div>
         <LangSwitcher />
       </nav>
     </header>

@@ -28,8 +28,8 @@
   --gray-90: #5A6B83;
   --gray-80: #C2CBD7;
   --gray-70: #E9EDF1;
-  --brand: #B22222;
-  --accent: #1C4582;
+  --brand: #1D62C9;
+  --accent: #F8221F;
 
   --color-bg: var(--white);
   --color-text: var(--dark);
@@ -49,14 +49,6 @@
 /* ─────────── Base resets ─────────── */
 html {
   scroll-behavior: auto;
-  /* Hide the vertical scrollbar gutter so the dark sections fill edge-to-edge.
-     Wheel / trackpad / keyboard scrolling still works. */
-  scrollbar-width: none;          /* Firefox */
-  -ms-overflow-style: none;       /* legacy Edge / IE */
-}
-html::-webkit-scrollbar,
-body::-webkit-scrollbar {
-  display: none;                  /* Chromium / Safari */
 }
 
 body {

@@ -1,93 +1,24 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Script from 'next/script';
 import Link from 'next/link';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+import { CITIES, slugify } from '@/lib/cities';
 
-function slugify(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
+
+// [lng, lat] — Mapbox convention, not [lat, lng].
+const IDLE_CENTER: [number, number] = [17.1077, 48.1486];
+const IDLE_ZOOM = 1.4;
+const CITY_ZOOM_CLOSE = 10;
+const CITY_ZOOM_MED = 8;
+const MIN_ZOOM = 1.2;
+const MAX_ZOOM = 14;
+
+function cityZoom(altitude: number): number {
+  return altitude <= 0.6 ? CITY_ZOOM_CLOSE : CITY_ZOOM_MED;
 }
-
-declare const Globe: (...args: unknown[]) => unknown;
-
-interface GlobeInstance {
-  backgroundColor: (c: string) => GlobeInstance;
-  atmosphereColor: (c: string) => GlobeInstance;
-  atmosphereAltitude: (n: number) => GlobeInstance;
-  globeImageUrl: (u: string) => GlobeInstance;
-  bumpImageUrl: (u: string) => GlobeInstance;
-  htmlElementsData: (d: unknown[]) => GlobeInstance;
-  htmlLat: (k: string) => GlobeInstance;
-  htmlLng: (k: string) => GlobeInstance;
-  htmlAltitude: (n: number) => GlobeInstance;
-  htmlElement: (f: (d: MarkerDatum) => HTMLElement) => GlobeInstance;
-  globeMaterial: () => { bumpScale: number };
-  pointOfView: (pov: { lat: number; lng: number; altitude: number }, ms: number) => void;
-  controls: () => {
-    autoRotate: boolean;
-    autoRotateSpeed: number;
-    enableZoom: boolean;
-  };
-  width: (w: number) => GlobeInstance;
-  height: (h: number) => GlobeInstance;
-}
-
-interface MarkerDatum {
-  idx: number;
-  lat: number;
-  lng: number;
-  name: string;
-  isActive: boolean;
-}
-
-const SLOVAKIA = { lat: 48.1486, lng: 17.1077 };
-
-interface City {
-  /** City name shown as the card title and the pin label. */
-  name: string;
-  /** Latitude — where the pin and camera-focus point sit. */
-  lat: number;
-  /** Longitude. */
-  lng: number;
-  /** Short narrative paragraph that opens the card body. */
-  desc: string;
-  /** Camera altitude when this city is focused. Smaller = closer/zoomed in. */
-  altitude: number;
-  /** Optional curated carousel photos for this city. When omitted, 5 random
-   *  photos are picked from /carousel/photo-XX.jpg. */
-  photos?: string[];
-}
-
-// Edit any field below — the panel and the globe focus update automatically.
-const CITIES: City[] = [
-  { name: 'Shanghai',   lat: 31.2304, lng: 121.4737, altitude: 0.5, desc: 'The skyline that announced modern China to the world. Pudong has been the setting for some of the most consequential negotiations of my career — fast, formal, and unforgiving of unprepared visitors.', photos: ['/cities/shanghai/1.jpeg', '/cities/shanghai/2.jpeg', '/cities/shanghai/3.jpeg', '/cities/shanghai/4.jpeg', '/cities/shanghai/5.jpeg'] },
-  { name: 'Beijing',    lat: 39.9042, lng: 116.4074, altitude: 0.5, desc: "Where every meaningful negotiation eventually leads. Beijing's rhythm is patient, hierarchical, and rewards relationships built over decades — not deals built overnight.", photos: ['/cities/beijing/1.jpeg', '/cities/beijing/2.jpeg', '/cities/beijing/3.jpeg', '/cities/beijing/4.jpeg'] },
-  { name: 'Guangzhou',  lat: 23.1291, lng: 113.2644, altitude: 0.5, desc: "Centuries of merchant trading heritage compressed into one city. Deals here move quickly, but only after the people across the table have decided you're worth their time." },
-  { name: 'Chengdu',    lat: 30.5728, lng: 104.0668, altitude: 1.0, desc: 'Patient relationship-building in western China. Business in Chengdu unfolds over tea, meals and long walks — never slide decks.' },
-  { name: 'Chongqing',  lat: 29.5630, lng: 106.5516, altitude: 1.0, desc: 'A mountain-and-river crossroads where industrial scale meets old-world bargaining instincts. Few visitors leave without changing their view of inland China.' },
-  { name: 'Shenzhen',   lat: 22.5429, lng: 114.0596, altitude: 0.5, desc: 'Innovation acceleration engine of the south. Shenzhen demands sustained engagement — partners here remember who showed up early and who stayed.' },
-  { name: 'Tianjin',    lat: 39.3434, lng: 117.3616, altitude: 0.5, desc: "Beijing's port and rehearsal stage. Many strategic conversations begin in Tianjin before they ever reach the capital." },
-  { name: "Xi'an",      lat: 34.3416, lng: 108.9398, altitude: 1.0, desc: "Silk Road heritage anchors every conversation here. Xi'an reminds you that trade between Europe and Asia is older than most national borders." },
-  { name: 'Hangzhou',   lat: 30.2741, lng: 120.1551, altitude: 0.5, desc: "Incubator of national-scale private enterprise. The lake city quietly produced China's most consequential consumer-tech founders." },
-  { name: 'Foshan',     lat: 23.0218, lng: 113.1219, altitude: 0.5, desc: 'Workshop city of the Pearl River Delta. Foshan rewards buyers who care about craftsmanship as much as price.' },
-  { name: 'Hong Kong',  lat: 22.3193, lng: 114.1694, altitude: 0.5, desc: 'International financial gateway with deep colonial trading roots. Hong Kong moves between Western boardrooms and mainland realities with practiced ease — and remembers everyone who treated it as merely a stepping stone.', photos: ['/cities/hongkong/1.jpeg', '/cities/hongkong/2.jpeg', '/cities/hongkong/3.jpeg', '/cities/hongkong/4.jpeg'] },
-  { name: 'Nanjing',    lat: 32.0603, lng: 118.7969, altitude: 0.5, desc: 'Old capital, deep institutions. Nanjing teaches you the difference between ceremony and substance.' },
-  { name: 'Jinan',      lat: 36.6512, lng: 117.1201, altitude: 1.0, desc: 'Spring city and provincial seat of Shandong. Jinan keeps a long memory — careers are made by people who return.', photos: ['/cities/jinan/1.jpeg', '/cities/jinan/2.jpeg', '/cities/jinan/3.jpeg', '/cities/jinan/4.jpeg', '/cities/jinan/5.jpeg', '/cities/jinan/6.jpeg', '/cities/jinan/7.jpeg', '/cities/jinan/8.jpeg'] },
-  { name: 'Qingdao',    lat: 36.0671, lng: 120.3826, altitude: 1.0, desc: "European industrial DNA, Asian execution. Qingdao's port and brewing history quietly shaped global manufacturing standards.", photos: ['/cities/qingdao/1.jpeg', '/cities/qingdao/2.jpeg', '/cities/qingdao/3.jpeg', '/cities/qingdao/4.jpeg', '/cities/qingdao/5.jpeg', '/cities/qingdao/6.jpeg'] },
-  { name: 'Changsha',   lat: 28.2282, lng: 112.9388, altitude: 1.0, desc: 'Confident, media-savvy capital of Hunan. Changsha negotiates with appetite and the assumption that anything can be built.' },
-  { name: 'Xiamen',     lat: 24.4798, lng: 118.0894, altitude: 0.5, desc: 'Quiet southern port with deep ties to Taiwan and Southeast Asia. Subtle, careful, and lucrative for those who learn its rhythms.' },
-  { name: 'Ningbo',     lat: 29.8683, lng: 121.5440, altitude: 0.5, desc: "One of the world's busiest container ports. Ningbo handles volume the way other cities handle conversation — quietly and without fuss." },
-  { name: 'Suzhou',     lat: 31.2989, lng: 120.5853, altitude: 0.5, desc: 'Classical gardens and one of the most successful industrial parks in Asia. Suzhou pairs aesthetic restraint with relentless execution.' },
-  { name: 'Hefei',      lat: 31.8206, lng: 117.2272, altitude: 0.5, desc: 'Quietly emergent science-and-industry capital. Hefei has become the city you must visit before assuming you understand modern Chinese manufacturing.' },
-  { name: 'Songpan',    lat: 32.6347, lng: 103.6018, altitude: 0.5, desc: 'Ancient walled town on the edge of the Tibetan Plateau. Conversations here move at altitude — slow, deliberate, and unforgettable.' },
-  { name: 'Jiuzhaigou', lat: 33.2614, lng: 103.9197, altitude: 0.5, desc: 'Turquoise lakes and protected valleys. Jiuzhaigou is the rare partner site where the meeting room is the landscape itself.' },
-  { name: 'Qiang City', lat: 31.6788, lng: 103.8519, altitude: 0.5, desc: 'Stone watchtowers and one of the oldest continuously inhabited cultures in western Sichuan. Trust here is generational, not contractual.' },
-  { name: 'Maoxian',    lat: 31.6815, lng: 103.8533, altitude: 0.5, desc: 'Mountain seat of the Qiang people. Maoxian rewards visitors who treat hospitality as the first stage of every negotiation.' },
-  { name: 'Cangzhou',   lat: 38.3037, lng: 116.8388, altitude: 0.5, desc: 'Industrial Hebei at its most direct. Cangzhou expects facts on the table within the first ten minutes — and respects you for arriving with them.' },
-  { name: 'Taipei',     lat: 25.0330, lng: 121.5654, altitude: 0.5, desc: 'Where supply chains, semiconductors and old family businesses still talk to each other. Taipei negotiates softly and remembers everything.' },
-  { name: 'Hohhot',     lat: 40.8414, lng: 111.7522, altitude: 1.0, desc: 'Grasslands capital with deep dairy, energy and cross-border interests. Hohhot conducts business with steppe-wide horizons.' },
-  { name: 'Yiwu',       lat: 29.3088, lng: 120.0762, altitude: 1.0, desc: "The world's small-commodities trading floor. A single afternoon in Yiwu can redraw what you thought a global supply chain looks like." },
-];
 
 const ALL_PHOTOS = Array.from({ length: 28 }, (_, i) =>
   `/carousel/photo-${String(i + 1).padStart(2, '0')}.jpg`,
@@ -97,138 +28,262 @@ function pickRandom(n: number): string[] {
   return ALL_PHOTOS.slice().sort(() => Math.random() - 0.5).slice(0, n);
 }
 
+function createMarkerEl(name: string, isActive: boolean, thumbUrl: string): HTMLDivElement {
+  const el = document.createElement('div');
+  el.className = 'globe-marker' + (isActive ? ' is-active' : '');
+  const shape = document.createElement('div');
+  shape.className = 'globe-marker-shape';
+  shape.innerHTML = `
+    <svg viewBox="0 0 32 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M16 2 C8 2 2 8 2 14 C2 22 16 34 16 34 C16 34 30 22 30 14 C30 8 24 2 16 2 Z" fill="currentColor"/>
+      <circle cx="16" cy="14" r="5" fill="#ffffff"/>
+    </svg>
+  `;
+  el.appendChild(shape);
+
+  // Hover preview: small thumbnail + city name. Only shown when the marker
+  // is in hover state AND not the active pin. Active pin shows the enlarged
+  // orange shape only, with no label/preview.
+  const preview = document.createElement('div');
+  preview.className = 'globe-marker-preview';
+  const img = document.createElement('img');
+  img.src = thumbUrl;
+  img.alt = '';
+  img.loading = 'lazy';
+  // Force 4:3 landscape, doubled from the previous size. Use setAttribute
+  // with `!important` so nothing in the cascade (Mapbox CSS, user-agent
+  // styles, anything) can override these dimensions.
+  img.setAttribute(
+    'style',
+    'width: 200px !important;' +
+      'height: 150px !important;' +
+      'min-width: 200px !important;' +
+      'min-height: 150px !important;' +
+      'max-width: 200px !important;' +
+      'max-height: 150px !important;' +
+      'object-fit: cover !important;' +
+      'display: block !important;' +
+      'border-radius: 4px 4px 0 0 !important;',
+  );
+  preview.appendChild(img);
+  const nameEl = document.createElement('div');
+  nameEl.className = 'globe-marker-name';
+  nameEl.textContent = name;
+  preview.appendChild(nameEl);
+  el.appendChild(preview);
+
+  return el;
+}
+
 export default function GlobeActivitySection() {
   const sectionRef = useRef<HTMLElement>(null);
   const starsRef = useRef<HTMLCanvasElement>(null);
-  const globeContainerRef = useRef<HTMLDivElement>(null);
-  const globeRef = useRef<GlobeInstance | null>(null);
-  const controlsRef = useRef<ReturnType<GlobeInstance['controls']> | null>(null);
-  const globeReadyRef = useRef(false);
-  const currentAltitudeRef = useRef(2.2);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const spinRef = useRef(true);
+  // True while the camera is moving (user drag/zoom, flyTo, or auto-spin).
+  // Used to gate marker hover so markers can't be "auto-hovered" by sliding
+  // under a stationary cursor.
+  const isCameraMovingRef = useRef(false);
 
   const [isOpen, setIsOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const [photoIdx, setPhotoIdx] = useState(0);
+  const [tokenMissing, setTokenMissing] = useState(false);
 
-  // One stable set of 5 photos per city.
   const cardsPhotos = useMemo(
     () => CITIES.map((c) => (c.photos && c.photos.length > 0 ? c.photos : pickRandom(5))),
     [],
   );
 
-  function buildPoints(activeIdxLocal: number | null): MarkerDatum[] {
-    return CITIES.map((d, i) => ({
-      idx: i,
-      lat: d.lat,
-      lng: d.lng,
-      name: d.name,
-      isActive: i === activeIdxLocal,
-    }));
-  }
-
-  function initGlobe() {
-    const container = globeContainerRef.current;
-    if (!container || typeof Globe !== 'function') return;
-    if (globeReadyRef.current) return;
-    globeReadyRef.current = true;
-
-    const globe = (Globe() as (el: HTMLElement) => GlobeInstance)(container)
-      .backgroundColor('rgba(0,0,0,0)')
-      .atmosphereColor('#6db4ff')
-      .atmosphereAltitude(0.22)
-      .globeImageUrl('/earth-blue-marble.jpg')
-      .bumpImageUrl('/globe-topology.png')
-      .htmlElementsData([])               // intro state shows no pins
-      .htmlLat('lat')
-      .htmlLng('lng')
-      .htmlAltitude(0.012)
-      .htmlElement((d: MarkerDatum) => {
-        const el = document.createElement('div');
-        el.className = 'globe-marker' + (d.isActive ? ' is-active' : '');
-        const shape = document.createElement('div');
-        shape.className = 'globe-marker-shape';
-        shape.innerHTML = `
-          <svg viewBox="0 0 32 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M16 2 C8 2 2 8 2 14 C2 22 16 34 16 34 C16 34 30 22 30 14 C30 8 24 2 16 2 Z" fill="currentColor"/>
-            <circle cx="16" cy="14" r="5" fill="#ffffff"/>
-          </svg>
-        `;
-        el.appendChild(shape);
-        const label = document.createElement('div');
-        label.className = 'globe-marker-label';
-        label.textContent = d.name;
-        el.appendChild(label);
-        el.addEventListener('mouseenter', () => {
-          // setState directly via closure won't see latest; dispatch a custom event
-          el.dispatchEvent(new CustomEvent('cityhover', { detail: d.idx, bubbles: true }));
-        });
-        return el;
-      });
-
-    globe.globeMaterial().bumpScale = 5;
-    globe.pointOfView({ lat: SLOVAKIA.lat, lng: SLOVAKIA.lng, altitude: 2.2 }, 0);
-
-    const ctrl = globe.controls();
-    ctrl.autoRotate = true;
-    ctrl.autoRotateSpeed = 0.3;
-    ctrl.enableZoom = false;
-
-    globeRef.current = globe;
-    controlsRef.current = ctrl;
-
-    function resize() {
-      globe.width(window.innerWidth).height(window.innerHeight);
-    }
-    resize();
-    window.addEventListener('resize', resize);
-  }
-
-  // Listen for marker hover events bubbling from the globe markers.
+  // Initialize the Mapbox globe once on mount.
   useEffect(() => {
-    const container = globeContainerRef.current;
+    const container = mapContainerRef.current;
     if (!container) return;
-    const handler = (e: Event) => {
-      const idx = (e as CustomEvent<number>).detail;
-      if (typeof idx === 'number') {
-        setActiveIdx(idx);
-        setPhotoIdx(0);
-      }
-    };
-    container.addEventListener('cityhover', handler as EventListener);
-    return () => container.removeEventListener('cityhover', handler as EventListener);
-  }, []);
-
-  // Sync globe with active city + open state. No pins in intro state.
-  useEffect(() => {
-    const globe = globeRef.current;
-    if (!globe) return;
-    if (!isOpen) {
-      globe.htmlElementsData([]);
-      globe.pointOfView({ lat: SLOVAKIA.lat, lng: SLOVAKIA.lng, altitude: 2.2 }, 1200);
-      currentAltitudeRef.current = 2.2;
+    if (!MAPBOX_TOKEN) {
+      setTokenMissing(true);
       return;
     }
-    globe.htmlElementsData(buildPoints(activeIdx));
+
+    mapboxgl.accessToken = MAPBOX_TOKEN;
+    const map = new mapboxgl.Map({
+      container,
+      style: 'mapbox://styles/sangtong/cmpmjqywo001f01r1fudm9pw2',
+      projection: { name: 'globe' },
+      center: IDLE_CENTER,
+      zoom: IDLE_ZOOM,
+      minZoom: MIN_ZOOM,
+      maxZoom: MAX_ZOOM,
+      attributionControl: false,
+      interactive: false,
+      pitchWithRotate: false,
+      dragRotate: false,
+    });
+
+    mapRef.current = map;
+    // Debug: expose the map so we can inspect lightPreset / theme from console
+    if (typeof window !== 'undefined') {
+      (window as unknown as { __tabMap?: mapboxgl.Map }).__tabMap = map;
+    }
+
+    // Track camera-motion state so marker hovers can be suppressed while
+    // the map is moving.
+    map.on('movestart', () => { isCameraMovingRef.current = true; });
+    map.on('moveend', () => {
+      // Small grace period after moveend in case the cursor is parked on
+      // a marker that just slid under it — don't immediately fire.
+      window.setTimeout(() => { isCameraMovingRef.current = false; }, 200);
+    });
+
+    map.on('style.load', () => {
+      // White "space" matches the section's page background so the globe
+      // appears to float on the page. Fog is a runtime-only API; it's not
+      // editable in Mapbox Studio.
+      // Sharp, narrow rim — horizon-blend at 0.01 keeps the colored band
+      // tight to the globe edge instead of bleeding outward into a gradient.
+      map.setFog({
+        color: 'rgb(255, 255, 255)',
+        'high-color': 'rgb(190, 210, 240)',
+        'horizon-blend': 0.01,
+        'space-color': 'rgb(255, 255, 255)',
+        'star-intensity': 0,
+      });
+
+      // Force-hide Mapbox Standard's built-in place labels (city/town names
+      // like "Yiwu") regardless of what's currently published in Studio.
+      // Our city markers already name each city, so the basemap labels are
+      // redundant clutter and overlap the active pin.
+      try {
+        map.setConfigProperty('basemap', 'showPlaceLabels', false);
+      } catch {
+        /* setConfigProperty only exists on Standard-based styles; ignore
+           on classic styles. */
+      }
+
+      // 3D terrain — runtime-only for classic styles (also not in Studio).
+      // Subtle exaggeration so mountainous regions read as raised when
+      // flying into cities near them.
+      if (!map.getSource('mapbox-dem')) {
+        map.addSource('mapbox-dem', {
+          type: 'raster-dem',
+          url: 'mapbox://mapbox.terrain-rgb',
+          tileSize: 512,
+          maxzoom: 14,
+        });
+      }
+      map.setTerrain({ source: 'mapbox-dem', exaggeration: 0.9 });
+
+      scheduleSpin(map);
+    });
+
+    return () => {
+      markersRef.current.forEach((m) => m.remove());
+      markersRef.current = [];
+      map.remove();
+      mapRef.current = null;
+    };
+  }, []);
+
+  // Smooth continuous rotation when idle. Each easeTo runs for a long
+  // duration with linear easing; when it ends or is interrupted, the
+  // `moveend` handler queues the next leg.
+  function scheduleSpin(map: mapboxgl.Map) {
+    function step() {
+      if (!spinRef.current) return;
+      const current = map.getBearing();
+      map.easeTo({
+        bearing: current - 60,
+        duration: 60_000,
+        easing: (t) => t,
+      });
+    }
+    map.on('moveend', () => {
+      if (spinRef.current) step();
+    });
+    step();
+  }
+
+  // Sync map state with the open/active flags.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Always clear old markers — they get recreated when needed.
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = [];
+
+    if (!isOpen) {
+      spinRef.current = true;
+      // Idle view: lock all user interactions so the auto-rotate isn't fought.
+      map.dragPan.disable();
+      map.scrollZoom.disable();
+      map.touchZoomRotate.disable();
+      map.doubleClickZoom.disable();
+      map.keyboard.disable();
+      map.stop();
+      map.flyTo({
+        center: IDLE_CENTER,
+        zoom: IDLE_ZOOM,
+        bearing: map.getBearing(),
+        duration: 1200,
+        essential: true,
+      });
+      return;
+    }
+
+    spinRef.current = false;
+    map.stop();
+
+    // Detail view: let the user drag/pan and zoom freely.
+    map.dragPan.enable();
+    map.scrollZoom.enable();
+    map.touchZoomRotate.enable();
+    map.doubleClickZoom.enable();
+    map.keyboard.enable();
+
+    CITIES.forEach((c, i) => {
+      const thumb = cardsPhotos[i]?.[0] || '/carousel/photo-01.jpg';
+      const el = createMarkerEl(c.name, i === activeIdx, thumb);
+      // Hover: show the thumbnail preview (gated while camera is moving
+      // so markers don't flash previews as they slide under the cursor).
+      el.addEventListener('mouseenter', () => {
+        if (isCameraMovingRef.current) return;
+        el.classList.add('is-hover');
+      });
+      el.addEventListener('mouseleave', () => {
+        el.classList.remove('is-hover');
+      });
+      // Click: activate the city (fly camera + populate the side card).
+      el.addEventListener('click', () => {
+        setActiveIdx(i);
+        setPhotoIdx(0);
+      });
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([c.lng, c.lat])
+        .addTo(map);
+      markersRef.current.push(marker);
+    });
+
     if (activeIdx !== null) {
       const c = CITIES[activeIdx];
-      globe.pointOfView({ lat: c.lat, lng: c.lng, altitude: c.altitude }, 1200);
-      currentAltitudeRef.current = c.altitude;
+      map.flyTo({
+        center: [c.lng, c.lat],
+        zoom: cityZoom(c.altitude),
+        bearing: 0,
+        duration: 1200,
+        essential: true,
+      });
     }
   }, [activeIdx, isOpen]);
 
-  function zoomBy(factor: number) {
-    const globe = globeRef.current;
-    if (!globe || activeIdx === null) return;
-    const c = CITIES[activeIdx];
-    const next = Math.min(4, Math.max(0.15, currentAltitudeRef.current * factor));
-    if (next === currentAltitudeRef.current) return;
-    globe.pointOfView({ lat: c.lat, lng: c.lng, altitude: next }, 400);
-    currentAltitudeRef.current = next;
+  function zoomBy(delta: number) {
+    const map = mapRef.current;
+    if (!map || activeIdx === null) return;
+    const next = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, map.getZoom() + delta));
+    if (next === map.getZoom()) return;
+    map.flyTo({ zoom: next, duration: 400, essential: true });
   }
-
-  useEffect(() => {
-    if (controlsRef.current) controlsRef.current.autoRotate = !isOpen;
-  }, [isOpen]);
 
   // Lock body scroll when detail panel is open.
   useEffect(() => {
@@ -270,8 +325,8 @@ export default function GlobeActivitySection() {
     setPhotoIdx(0);
   }, [activeIdx]);
 
-  // Stars animation (port from globe-ver-3.html, but draws into a canvas
-  // that is absolutely positioned inside the section so it scrolls with the page).
+  // Stars animation kept for the section's white-to-black backdrop strip
+  // (currently hidden via CSS). Preserved for parity with the previous build.
   useEffect(() => {
     const canvas = starsRef.current;
     const section = sectionRef.current;
@@ -357,26 +412,29 @@ export default function GlobeActivitySection() {
 
   return (
     <>
-      <Script
-        src="https://cdn.jsdelivr.net/npm/globe.gl@2"
-        strategy="afterInteractive"
-        onLoad={initGlobe}
-      />
       <section id="activity" ref={sectionRef} className="ga-section">
         <canvas ref={starsRef} className="ga-stars" />
-        {/* Solid backdrop that only exists in detail mode, so the fixed globe
-            + panel never reveal whatever section is behind the activity. */}
         <div className={`ga-backdrop${isOpen ? ' visible' : ''}`} aria-hidden="true" />
         <div
-          ref={globeContainerRef}
+          ref={mapContainerRef}
           className={`ga-globe${isOpen ? ' shifted' : ''}`}
         />
+
+        {tokenMissing && (
+          <div className="ga-token-warn" role="alert">
+            <strong>Mapbox token missing.</strong>
+            <span>
+              Add <code>NEXT_PUBLIC_MAPBOX_TOKEN</code> to your <code>.env</code> and restart the dev server.
+              Get a free token at <a href="https://account.mapbox.com/access-tokens/" target="_blank" rel="noreferrer">mapbox.com</a>.
+            </span>
+          </div>
+        )}
 
         <div className={`ga-intro${isOpen ? ' out' : ''}`}>
           <h2>A career mapped across continents.</h2>
           <p>Each pin marks years of work — negotiations, factories, partnerships and the people behind them. Explore the cities that have shaped four decades of foreign trade, with a focus on the relationships built across China.</p>
           <button type="button" className="ga-cta" onClick={() => { setIsOpen(true); setActiveIdx(0); }}>
-            View cities
+            Explore now
           </button>
         </div>
 
@@ -415,9 +473,27 @@ export default function GlobeActivitySection() {
               </div>
               <div className="ga-card-body">
                 <h2 className="ga-name">{activeCity.name}</h2>
+                <button
+                  type="button"
+                  className="ga-location"
+                  onClick={() => {
+                    const map = mapRef.current;
+                    if (!map || activeIdx === null) return;
+                    const c = CITIES[activeIdx];
+                    map.flyTo({
+                      center: [c.lng, c.lat],
+                      zoom: cityZoom(c.altitude),
+                      bearing: 0,
+                      duration: 1000,
+                      essential: true,
+                    });
+                  }}
+                >
+                  Go to location
+                </button>
                 <p className="ga-desc">{activeCity.desc}</p>
                 <Link href={`/activities?id=${slugify(activeCity.name)}`} className="ga-button">
-                  View Details
+                  Explore now
                 </Link>
               </div>
             </article>
@@ -429,7 +505,7 @@ export default function GlobeActivitySection() {
             type="button"
             aria-label="Zoom in"
             className="ga-zoom-btn"
-            onClick={() => zoomBy(0.7)}
+            onClick={() => zoomBy(+1)}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M12 5v14M5 12h14" />
@@ -439,12 +515,35 @@ export default function GlobeActivitySection() {
             type="button"
             aria-label="Zoom out"
             className="ga-zoom-btn"
-            onClick={() => zoomBy(1.4)}
+            onClick={() => zoomBy(-1)}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M5 12h14" />
             </svg>
           </button>
+        </div>
+
+        <div className={`ga-hints${isOpen ? ' visible' : ''}`} aria-hidden={!isOpen}>
+          <div className="ga-hint">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3v18M3 12h18M7 7l-4 5 4 5M17 7l4 5-4 5M7 7l5-4 5 4M7 17l5 4 5-4" />
+            </svg>
+            <span>Drag to move<br />the globe around</span>
+          </div>
+          <div className="ga-hint">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M21 21l-4.3-4.3M8 11h6M11 8v6" />
+            </svg>
+            <span>Zoom in &amp; out<br />to view</span>
+          </div>
+          <div className="ga-hint">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 21s7-7 7-12a7 7 0 1 0-14 0c0 5 7 12 7 12z" />
+              <circle cx="12" cy="9" r="2.5" />
+            </svg>
+            <span>Click on city to view<br />details</span>
+          </div>
         </div>
 
       </section>
@@ -487,10 +586,47 @@ export default function GlobeActivitySection() {
           transform: translateY(30%) scale(1);
           transform-origin: center center;
           transition: transform 1.1s cubic-bezier(0.65, 0.05, 0.36, 1);
+          background: transparent;
         }
         .ga-globe.shifted {
           position: fixed;
           transform: translate(0, 0) scale(1);
+        }
+        /* Mapbox renders into a child canvas; ensure full coverage. */
+        .ga-globe .mapboxgl-canvas {
+          width: 100% !important;
+          height: 100% !important;
+        }
+        /* Hide attribution UI completely (we leave the legal attribution
+           in the footer of the site). */
+        .ga-globe .mapboxgl-ctrl-attrib,
+        .ga-globe .mapboxgl-ctrl-logo {
+          display: none !important;
+        }
+        .ga-token-warn {
+          position: absolute;
+          top: 20px; left: 50%;
+          transform: translateX(-50%);
+          z-index: 12;
+          max-width: 520px;
+          padding: 12px 18px;
+          background: #fff3cd;
+          color: #664d03;
+          border: 1px solid #ffe69c;
+          border-radius: 12px;
+          font-size: 13px;
+          line-height: 1.45;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          box-shadow: 0 4px 18px rgba(0,0,0,0.08);
+        }
+        .ga-token-warn a { color: #664d03; text-decoration: underline; }
+        .ga-token-warn code {
+          background: rgba(0,0,0,0.06);
+          padding: 1px 6px;
+          border-radius: 4px;
+          font-size: 12px;
         }
         .ga-intro {
           position: absolute;
@@ -526,24 +662,24 @@ export default function GlobeActivitySection() {
         }
         .ga-cta {
           pointer-events: auto;
-          display: inline-block;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           margin-top: 24px;
-          padding: 12px 26px;
+          padding: 12px 24px;
           font-family: inherit;
-          font-size: 13px;
+          font-size: 16px;
           font-weight: 500;
-          letter-spacing: 0.04em;
-          color: #1a1a1a;
-          background: rgba(0, 0, 0, 0.03);
-          border: 1px solid rgba(0, 0, 0, 0.35);
-          border-radius: 999px;
+          color: #ffffff;
+          background: var(--brand);
+          border: 0;
+          border-radius: 8px;
           text-decoration: none;
           cursor: pointer;
-          transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+          transition: filter 0.2s ease, transform 0.2s ease;
         }
         .ga-cta:hover {
-          background: rgba(0, 0, 0, 0.08);
-          border-color: rgba(0, 0, 0, 0.7);
+          filter: brightness(1.1);
           transform: translateY(-1px);
         }
         .ga-panel {
@@ -570,12 +706,13 @@ export default function GlobeActivitySection() {
           position: relative;
           display: flex;
           flex-direction: column;
-          background: #0a1d3a;
-          color: #ffffff;
+          background: #ffffff;
+          color: #1a1a1a;
           border-radius: 20px;
           overflow: hidden;
-          border: 2px solid rgba(255, 255, 255, 0.18);
-          box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+          border: 1px solid rgba(0, 0, 0, 0.06);
+          box-shadow: 0 14px 44px rgba(15, 23, 42, 0.12),
+                      0 2px 8px rgba(15, 23, 42, 0.06);
         }
         .ga-progress {
           position: absolute;
@@ -621,12 +758,30 @@ export default function GlobeActivitySection() {
           flex-direction: column;
         }
         .ga-name {
-          margin: 0 0 18px;
-          color: #ffffff;
+          margin: 0 0 6px;
+          color: #1a1a1a;
           font-weight: 700;
           font-size: 30px;
           line-height: 1.15;
           letter-spacing: -0.01em;
+        }
+        .ga-location {
+          align-self: flex-start;
+          margin: 0 0 18px;
+          padding: 0;
+          background: none;
+          border: none;
+          font-family: inherit;
+          font-size: 14px;
+          font-weight: 500;
+          color: #2563eb;
+          cursor: pointer;
+          text-decoration: none;
+          transition: color 0.18s ease;
+        }
+        .ga-location:hover {
+          color: #1d4ed8;
+          text-decoration: underline;
         }
         .ga-eyebrow {
           margin: 0 0 18px;
@@ -638,7 +793,7 @@ export default function GlobeActivitySection() {
         .ga-desc {
           margin: 0 0 24px;
           padding: 0;
-          color: #d8dde6;
+          color: #4a5560;
           font-size: 15px;
           line-height: 1.55;
           font-weight: 400;
@@ -646,9 +801,9 @@ export default function GlobeActivitySection() {
         .ga-button {
           margin: 0;
           align-self: flex-start;
-          padding: 10px 22px;
-          background: #ffffff;
-          color: #0a1d3a;
+          padding: 10px 24px;
+          background: #2563eb;
+          color: #ffffff;
           border: none;
           border-radius: 999px;
           font-family: inherit;
@@ -656,9 +811,14 @@ export default function GlobeActivitySection() {
           font-weight: 600;
           cursor: pointer;
           text-decoration: none;
-          transition: background 0.2s ease, transform 0.2s ease;
+          box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+          transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
         }
-        .ga-button:hover { background: #e6ecf5; transform: translateY(-1px); }
+        .ga-button:hover {
+          background: #1d4ed8;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+        }
         .ga-zoom {
           position: fixed;
           top: 50%;
@@ -695,28 +855,73 @@ export default function GlobeActivitySection() {
         .ga-zoom-btn:hover { background: rgba(0, 0, 0, 0.06); }
         .ga-zoom-btn + .ga-zoom-btn { border-top: 1px solid rgba(0, 0, 0, 0.12); }
         .ga-zoom-btn svg { width: 16px; height: 16px; }
+        .ga-hints {
+          position: fixed;
+          bottom: 28px;
+          /* Align the left edge with the zoom button stack (left: 28px). */
+          left: 28px;
+          z-index: 200;
+          display: flex;
+          gap: 40px;
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.45s ease 0.3s;
+        }
+        .ga-hints.visible {
+          opacity: 1;
+        }
+        .ga-hint {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          color: #1a1a1a;
+          font-size: 13px;
+          line-height: 1.25;
+          font-weight: 500;
+          letter-spacing: 0;
+        }
+        .ga-hint svg {
+          width: 20px;
+          height: 20px;
+          flex-shrink: 0;
+          color: #1a1a1a;
+        }
+        @media (max-width: 720px) {
+          .ga-hints {
+            left: 16px;
+            right: 16px;
+            bottom: 16px;
+            gap: 18px;
+            flex-wrap: wrap;
+            justify-content: center;
+          }
+          .ga-hint {
+            font-size: 11px;
+          }
+        }
         .ga-close {
           position: absolute;
           top: 14px; right: 14px;
-          width: 34px; height: 34px;
+          width: 32px; height: 32px;
           z-index: 2;
           display: flex; align-items: center; justify-content: center;
-          background: rgba(0, 0, 0, 0.45);
+          background: rgba(255, 255, 255, 0.92);
           border: none;
           border-radius: 50%;
-          color: #ffffff;
+          color: #1a1a1a;
           cursor: pointer;
           padding: 0;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
           transition: background 0.18s ease, transform 0.18s ease;
         }
-        .ga-close:hover { background: rgba(0, 0, 0, 0.7); transform: scale(1.05); }
+        .ga-close:hover { background: #ffffff; transform: scale(1.05); }
         .ga-close svg { width: 16px; height: 16px; }
         .globe-marker {
+          /* Do NOT set position here — Mapbox applies position:absolute and
+             a translate() transform on the marker element to place it at
+             the marker's lng/lat. Overriding position breaks placement. */
           cursor: pointer;
           pointer-events: auto;
-          position: relative;
-          /* Anchor the pin so its tip (at 85% of the SVG) sits on the lat/lng. */
-          transform: translate(-50%, -85%);
           padding: 4px;
         }
         .globe-marker.is-active {
@@ -727,9 +932,10 @@ export default function GlobeActivitySection() {
           height: 22.5px;
           display: block;
           color: #1a1a1a;
-          will-change: transform;
-          transform: translateZ(0);
-          transition: transform 0.2s ease, color 0.2s ease;
+          /* Do NOT add will-change/translateZ here — it lifts the shape into
+             its own GPU layer and makes it lag the parent's transform updates
+             during Mapbox's zoom/pan animations (pins appear to drift). */
+          transition: color 0.2s ease;
         }
         .globe-marker-shape svg {
           width: 100%;
@@ -738,28 +944,58 @@ export default function GlobeActivitySection() {
           overflow: visible;
         }
         .globe-marker.is-active .globe-marker-shape {
-          color: #e8421c;
+          /* Bright, saturated red so the active pin reads clearly against
+             the warm-toned basemap. */
+          color: #ef4444;
           transform: scale(1.55);
         }
-        .globe-marker-label {
+        /* Hover preview: shown when an inactive marker is hovered.
+           Container itself has no fill — only the image and the label
+           below it have visible surfaces. */
+        .globe-marker-preview {
           position: absolute;
-          left: calc(100% + 2px);
+          left: calc(100% + 10px);
           top: 50%;
-          transform: translateY(-50%) translateX(-6px);
-          background: #0a1d3a;
-          color: #ffffff;
-          padding: 6px 14px;
-          border-radius: 999px;
-          font-size: 13px;
-          font-weight: 600;
-          line-height: 1.2;
-          white-space: nowrap;
+          transform: translateY(-50%) translateX(-4px);
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          /* No background / border-radius / shadow on the container itself. */
           opacity: 0;
           pointer-events: none;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-          transition: opacity 0.22s ease, transform 0.22s ease;
+          transition: opacity 0.18s ease, transform 0.18s ease;
+          z-index: 4;
         }
-        .globe-marker.is-active .globe-marker-label {
+        .globe-marker-preview img {
+          /* 4:3 landscape, ~doubled from the previous 96×60. */
+          width: 200px;
+          height: 150px;
+          object-fit: cover;
+          display: block;
+          border-radius: 12px;
+          background: #e5e7eb;
+          box-shadow: 0 8px 22px rgba(15, 23, 42, 0.22),
+                      0 2px 6px rgba(15, 23, 42, 0.10);
+        }
+        .globe-marker-name {
+          /* Sits flush against the image bottom (no gap) so the two form
+             one continuous shape: image (rounded top, flat bottom) +
+             label (flat top, rounded bottom). Left-aligned to the image. */
+          margin-top: 0;
+          padding: 8px 18px;
+          background: #ffffff;
+          color: #1a1a1a;
+          font-size: 16px;
+          font-weight: 400;
+          line-height: 1.2;
+          white-space: nowrap;
+          text-align: left;
+          border-radius: 0 0 4px 4px;
+          box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+        }
+        /* Show preview only when hovering an inactive pin. Active pins
+           display the enlarged orange shape only — no label/preview. */
+        .globe-marker.is-hover:not(.is-active) .globe-marker-preview {
           opacity: 1;
           transform: translateY(-50%) translateX(0);
         }

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { DM_Sans, Noto_Sans_SC } from 'next/font/google';
+import { DM_Sans, Noto_Sans_SC, Italianno } from 'next/font/google';
 import './globals.css';
 import { I18nProvider } from '@/lib/i18n-context';
 import { ThemeProvider } from '@/lib/theme-context';
@@ -18,6 +18,13 @@ const notoSansSC = Noto_Sans_SC({
   subsets: ['latin'],
   weight: ['400', '500'],
   variable: '--font-noto-sc',
+  display: 'swap',
+});
+
+const italianno = Italianno({
+  subsets: ['latin'],
+  weight: ['400'],
+  variable: '--font-italianno',
   display: 'swap',
 });
 
@@ -55,7 +62,7 @@ export default async function RootLayout({
   } as React.CSSProperties;
 
   return (
-    <html lang="en" className={`${dmSans.variable} ${notoSansSC.variable}`} style={themeVars}>
+    <html lang="en" className={`${dmSans.variable} ${notoSansSC.variable} ${italianno.variable}`} style={themeVars}>
       <body className="bg-bg text-text leading-snug">
         <I18nProvider languages={languages} dictionaries={dictionaries}>
           <ThemeProvider settings={settings}>

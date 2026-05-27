@@ -14,11 +14,12 @@ export default function Footer() {
       <div className="max-w-[var(--max-width)] mx-auto grid grid-cols-[1.6fr_1fr_1fr] gap-16 pb-14 max-sm:grid-cols-1 max-sm:gap-10 max-sm:pb-10">
         <div className="flex flex-col gap-4 max-w-[400px]">
           <Link href="/" className="inline-flex items-center" aria-label={logoText}>
-            <img
-              src="/logo-tabernam.png"
-              alt={logoText}
-              className="w-[150px] h-auto"
-            />
+            <span
+              className="text-brand leading-none select-none text-[60px]"
+              style={{ fontFamily: 'var(--font-italianno), cursive' }}
+            >
+              {logoText}
+            </span>
           </Link>
           <p className="text-[15px] leading-relaxed text-muted">A consulting practice rooted in four decades of foreign trade. Based in Bratislava, working with partners across China and dozens of markets beyond.</p>
         </div>

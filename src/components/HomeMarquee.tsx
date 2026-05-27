@@ -32,7 +32,7 @@ const ROW_3_IMAGES = [
 export default function HomeMarquee() {
   return (
     <motion.section
-      className="home-marquee w-full flex flex-col gap-5 py-10"
+      className="home-marquee w-full flex flex-col gap-5 py-[60px]"
       initial={{ opacity: 0 }}
       whileInView={{ opacity: 1 }}
       viewport={{ once: true, amount: 0.1 }}
